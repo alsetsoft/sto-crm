@@ -33,7 +33,7 @@ export function LoginForm() {
     }
 
     toast.success("Вхід виконано");
-    router.replace("/sklad");
+    router.replace("/plan");
     router.refresh();
   }
 
@@ -45,7 +45,7 @@ export function LoginForm() {
         </span>
         <h1 className="text-2xl font-bold text-foreground">СТО CRM</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Вхід для власника
+          Вхід для працівників
         </p>
       </div>
 

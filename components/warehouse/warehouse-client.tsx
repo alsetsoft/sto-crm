@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Package, Search, Archive, Save, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Package, Search, Archive, Save, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
@@ -17,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WarehouseTable } from "./warehouse-table";
-import { NewItemDialog } from "./new-item-dialog";
+import { uploadWarehousePhoto } from "./photo";
 import {
   ALL_CATEGORIES,
   computeStats,
@@ -40,6 +41,7 @@ export function WarehouseClient({
   const [category, setCategory] = useState<string>(ALL_CATEGORIES);
   const [showArchived, setShowArchived] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -142,6 +144,35 @@ export function WarehouseClient({
     toast.success(item.is_archived ? "Позицію відновлено" : "Позицію архівовано");
   }
 
+  async function handlePhoto(item: WarehouseItemRow, file: File) {
+    setUploadingId(item.id);
+    try {
+      const url = await uploadWarehousePhoto(file);
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("warehouse_items")
+        .update({ photo_url: url })
+        .eq("id", item.id)
+        .select("*")
+        .single();
+
+      if (error || !data) {
+        toast.error("Не вдалося зберегти фото", { description: error?.message });
+        return;
+      }
+      setItems((prev) =>
+        prev.map((it) => (it.id === item.id ? (data as WarehouseItemRow) : it))
+      );
+      toast.success("Фото оновлено");
+    } catch (e) {
+      toast.error("Не вдалося завантажити фото", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
   async function handleDelete(item: WarehouseItemRow) {
     if (!window.confirm(`Видалити позицію «${item.name}»?`)) return;
     const supabase = createClient();
@@ -161,10 +192,6 @@ export function WarehouseClient({
       return next;
     });
     toast.success("Позицію видалено");
-  }
-
-  function handleCreated(item: WarehouseItemRow) {
-    setItems((prev) => [item, ...prev]);
   }
 
   return (
@@ -198,7 +225,12 @@ export function WarehouseClient({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <NewItemDialog onCreated={handleCreated} />
+          <Button asChild>
+            <Link href="/sklad/nova">
+              <Plus className="h-4 w-4" aria-hidden />
+              Нова позиція
+            </Link>
+          </Button>
         </div>
       </header>
 
@@ -250,9 +282,11 @@ export function WarehouseClient({
       <WarehouseTable
         items={visibleItems}
         edits={edits}
+        uploadingId={uploadingId}
         onEdit={handleEdit}
         onToggleArchive={handleToggleArchive}
         onDelete={handleDelete}
+        onPhoto={handlePhoto}
       />
 
       {/* Sticky save bar */}

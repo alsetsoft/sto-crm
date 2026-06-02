@@ -1,9 +1,18 @@
 "use client";
 
-import { AlertTriangle, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { useRef } from "react";
+import Image from "next/image";
+import {
+  AlertTriangle,
+  Archive,
+  ArchiveRestore,
+  ImagePlus,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 
 import type { WarehouseItemRow } from "@/lib/supabase/types";
-import { cn } from "@/lib/utils";
+import { cn, formatUAH } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -24,9 +33,56 @@ import {
 interface WarehouseTableProps {
   items: WarehouseItemRow[];
   edits: EditMap;
+  uploadingId: string | null;
   onEdit: (id: string, field: EditableField, value: number) => void;
   onToggleArchive: (item: WarehouseItemRow) => void;
   onDelete: (item: WarehouseItemRow) => void;
+  onPhoto: (item: WarehouseItemRow, file: File) => void;
+}
+
+function PhotoCell({
+  item,
+  uploading,
+  onPhoto,
+}: {
+  item: WarehouseItemRow;
+  uploading: boolean;
+  onPhoto: (item: WarehouseItemRow, file: File) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <button
+      type="button"
+      onClick={() => ref.current?.click()}
+      title={item.photo_url ? "Змінити фото" : "Додати фото"}
+      className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40 text-muted-foreground transition-smooth hover:border-primary hover:text-primary"
+    >
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onPhoto(item, file);
+          e.target.value = "";
+        }}
+      />
+      {uploading ? (
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+      ) : item.photo_url ? (
+        <Image
+          src={item.photo_url}
+          alt={item.name}
+          fill
+          sizes="44px"
+          className="object-cover"
+        />
+      ) : (
+        <ImagePlus className="h-4 w-4" aria-hidden />
+      )}
+    </button>
+  );
 }
 
 const NUMERIC_HEADERS: { field: EditableField; label: string }[] = [
@@ -77,9 +133,11 @@ function NumberCell({
 export function WarehouseTable({
   items,
   edits,
+  uploadingId,
   onEdit,
   onToggleArchive,
   onDelete,
+  onPhoto,
 }: WarehouseTableProps) {
   if (items.length === 0) {
     return (
@@ -94,6 +152,7 @@ export function WarehouseTable({
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
+            <TableHead className="w-[60px]">Фото</TableHead>
             <TableHead className="min-w-[220px]">Назва / Артикул</TableHead>
             <TableHead>Категорія</TableHead>
             {NUMERIC_HEADERS.map((h) => (
@@ -101,6 +160,7 @@ export function WarehouseTable({
                 {h.label}
               </TableHead>
             ))}
+            <TableHead className="text-center">Маржа</TableHead>
             <TableHead>Місце</TableHead>
             <TableHead className="w-[88px] text-right">{""}</TableHead>
           </TableRow>
@@ -122,6 +182,13 @@ export function WarehouseTable({
                   status === "below" && "bg-warning/5"
                 )}
               >
+                <TableCell>
+                  <PhotoCell
+                    item={item}
+                    uploading={uploadingId === item.id}
+                    onPhoto={onPhoto}
+                  />
+                </TableCell>
                 <TableCell>
                   <div className="font-medium text-foreground">{item.name}</div>
                   {item.article ? (
@@ -145,6 +212,26 @@ export function WarehouseTable({
                     />
                   </TableCell>
                 ))}
+
+                <TableCell className="text-center">
+                  {(() => {
+                    const margin =
+                      effective(item, edits, "sale_price") -
+                      effective(item, edits, "purchase_price");
+                    return (
+                      <span
+                        className={cn(
+                          "text-sm font-medium tabular-nums",
+                          margin > 0 && "text-success",
+                          margin < 0 && "text-destructive",
+                          margin === 0 && "text-muted-foreground"
+                        )}
+                      >
+                        {formatUAH(margin)}
+                      </span>
+                    );
+                  })()}
+                </TableCell>
 
                 <TableCell className="text-muted-foreground">
                   {item.location ?? "—"}

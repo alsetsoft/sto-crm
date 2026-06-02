@@ -8,6 +8,7 @@ import { Package, LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { NAV_ITEMS } from "./nav-items";
+import { ROLE_LABEL, type Viewer } from "@/lib/auth/roles";
 
 function Brand() {
   return (
@@ -52,35 +53,52 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function SignOut() {
+function AccountFooter({ viewer }: { viewer: Viewer }) {
+  const roleLabel = viewer.role ? ROLE_LABEL[viewer.role] : "—";
+  const initial = (viewer.email ?? "?").trim().charAt(0).toUpperCase();
   return (
-    <form action="/auth/signout" method="post" className="px-1">
-      <Button
-        type="submit"
-        variant="ghost"
-        className="w-full justify-start text-muted-foreground hover:text-foreground"
-      >
-        <LogOut className="h-4 w-4" aria-hidden />
-        Вийти
-      </Button>
-    </form>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2.5 rounded-md bg-muted/40 px-3 py-2">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-foreground">
+          {initial}
+        </span>
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="text-sm font-medium text-foreground">{roleLabel}</span>
+          {viewer.email ? (
+            <span className="truncate text-xs text-muted-foreground">
+              {viewer.email}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <form action="/auth/signout" method="post" className="px-1">
+        <Button
+          type="submit"
+          variant="ghost"
+          className="w-full justify-start text-muted-foreground hover:text-foreground"
+        >
+          <LogOut className="h-4 w-4" aria-hidden />
+          Вийти
+        </Button>
+      </form>
+    </div>
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ viewer }: { viewer: Viewer }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="dark fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-6 border-r border-border bg-card px-3 py-5 lg:flex">
+      <aside className="dark fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-6 border-r border-border bg-card px-3 py-5 lg:flex print:hidden">
         <Brand />
         <NavList />
-        <SignOut />
+        <AccountFooter viewer={viewer} />
       </aside>
 
       {/* Mobile top bar */}
-      <header className="dark fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
+      <header className="dark fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 lg:hidden print:hidden">
         <Brand />
         <Button
           variant="ghost"
@@ -113,7 +131,7 @@ export function Sidebar() {
               </Button>
             </div>
             <NavList onNavigate={() => setOpen(false)} />
-            <SignOut />
+            <AccountFooter viewer={viewer} />
           </aside>
         </div>
       ) : null}

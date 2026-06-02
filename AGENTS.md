@@ -2,6 +2,13 @@
 
 Project rules for AI agents working in this repo.
 
+## UI / UX
+
+- **No modals/dialogs for create & edit flows.** Creating or editing an entity
+  (e.g. a warehouse position) must use a dedicated sub-page/route, never a modal
+  or `Dialog`. Add the form under a child route (e.g. `/sklad/nova`) and navigate
+  to it. Modals/dialogs are acceptable only for lightweight confirmations.
+
 ## Database / Supabase
 
 - **Do NOT add more Supabase migration files.** Do not create new files under `supabase/migrations/`.
