@@ -79,6 +79,21 @@ export type WarehouseItemInsert = Omit<
 
 export type WarehouseItemUpdate = Partial<WarehouseItemInsert>;
 
+/** Distinct category/subcategory pair used to build the filter dropdowns. */
+export type WarehouseCategoryPair = {
+  category: string;
+  subcategory: string | null;
+};
+
+/** Return shape of the `warehouse_overview()` RPC (global stats + filter options). */
+export type WarehouseOverview = {
+  active_count: number;
+  below_min: number;
+  negative: number;
+  total_value: number;
+  categories: WarehouseCategoryPair[];
+};
+
 // ---------------------------------------------------------------------------
 // Customers (Клієнти)
 // ---------------------------------------------------------------------------
@@ -547,7 +562,12 @@ export type Database = {
         Relationships: [];
       };
     };
-    Functions: { [_ in never]: never };
+    Functions: {
+      warehouse_overview: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+    };
     Enums: {
       order_status: OrderStatus;
       problem_criticality: ProblemCriticality;

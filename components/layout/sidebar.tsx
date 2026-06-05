@@ -29,8 +29,26 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-1 flex-col gap-1">
       {NAV_ITEMS.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = item.icon;
+
+        if (!item.available) {
+          return (
+            <div
+              key={item.href}
+              aria-disabled
+              title="Поки недоступно"
+              className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground/45"
+            >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              <span>{item.label}</span>
+              <span className="ml-auto rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                Скоро
+              </span>
+            </div>
+          );
+        }
+
+        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}

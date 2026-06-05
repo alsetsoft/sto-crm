@@ -8,13 +8,14 @@ import {
   ArchiveRestore,
   ImagePlus,
   Loader2,
+  Minus,
+  Plus,
   Trash2,
 } from "lucide-react";
 
 import type { WarehouseItemRow } from "@/lib/supabase/types";
 import { cn, formatUAH } from "@/lib/utils";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -85,6 +86,11 @@ function PhotoCell({
   );
 }
 
+// Sticky column header: opaque card background so scrolling rows don't show
+// through, raised above row content. Sticks to the top of the scroll region
+// (the wrapper below), which contains the table on both axes.
+const STICKY_HEAD = "sticky top-0 z-20 border-b border-border bg-card";
+
 const NUMERIC_HEADERS: { field: EditableField; label: string }[] = [
   { field: "quantity", label: "Залишок" },
   { field: "min_stock", label: "Мін." },
@@ -92,6 +98,9 @@ const NUMERIC_HEADERS: { field: EditableField; label: string }[] = [
   { field: "purchase_price", label: "Закупка" },
   { field: "sale_price", label: "Продаж" },
 ];
+
+const STEP_BTN =
+  "flex h-9 w-7 shrink-0 items-center justify-center text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40";
 
 function NumberCell({
   value,
@@ -108,21 +117,47 @@ function NumberCell({
 }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <input
-        inputMode="decimal"
+      <div
         className={cn(
-          "h-9 w-20 rounded-md border bg-card px-2 text-center text-sm text-foreground shadow-sm transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          status === "negative" && "border-destructive text-destructive",
-          status === "below" && "border-warning text-warning",
+          "flex items-center overflow-hidden rounded-md border bg-card shadow-sm transition-smooth focus-within:ring-2 focus-within:ring-ring",
+          status === "negative" && "border-destructive",
+          status === "below" && "border-warning",
           (!status || status === "ok") && "border-input",
           dirty && "border-primary ring-1 ring-primary/40"
         )}
-        value={Number.isInteger(value) ? String(value) : String(value)}
-        onChange={(e) => {
-          const n = Number(e.target.value.replace(",", "."));
-          onChange(Number.isFinite(n) ? n : 0);
-        }}
-      />
+      >
+        <button
+          type="button"
+          aria-label="Зменшити на 1"
+          // Stepper is bounded at 0; manual entry below stays free (negative stock).
+          disabled={value <= 0}
+          onClick={() => onChange(Math.max(0, value - 1))}
+          className={cn(STEP_BTN, "border-r border-input")}
+        >
+          <Minus className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <input
+          inputMode="decimal"
+          className={cn(
+            "h-9 w-12 bg-transparent px-1 text-center text-sm text-foreground focus-visible:outline-none",
+            status === "negative" && "text-destructive",
+            status === "below" && "text-warning"
+          )}
+          value={String(value)}
+          onChange={(e) => {
+            const n = Number(e.target.value.replace(",", "."));
+            onChange(Number.isFinite(n) ? n : 0);
+          }}
+        />
+        <button
+          type="button"
+          aria-label="Збільшити на 1"
+          onClick={() => onChange(value + 1)}
+          className={cn(STEP_BTN, "border-l border-input")}
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      </div>
       {unit ? (
         <span className="text-[11px] text-muted-foreground">{unit}</span>
       ) : null}
@@ -148,21 +183,27 @@ export function WarehouseTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
-      <Table>
+    <div className="max-h-[calc(100vh-13rem)] overflow-auto rounded-lg border border-border bg-card shadow-card">
+      <table className="w-full caption-bottom text-sm">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className="w-[60px]">Фото</TableHead>
-            <TableHead className="min-w-[220px]">Назва / Артикул</TableHead>
-            <TableHead>Категорія</TableHead>
+            <TableHead className={cn(STICKY_HEAD, "w-[60px] rounded-tl-lg")}>
+              Фото
+            </TableHead>
+            <TableHead className={cn(STICKY_HEAD, "min-w-[220px]")}>
+              Назва / Артикул
+            </TableHead>
+            <TableHead className={STICKY_HEAD}>Категорія</TableHead>
             {NUMERIC_HEADERS.map((h) => (
-              <TableHead key={h.field} className="text-center">
+              <TableHead key={h.field} className={cn(STICKY_HEAD, "text-center")}>
                 {h.label}
               </TableHead>
             ))}
-            <TableHead className="text-center">Маржа</TableHead>
-            <TableHead>Місце</TableHead>
-            <TableHead className="w-[88px] text-right">{""}</TableHead>
+            <TableHead className={cn(STICKY_HEAD, "text-center")}>Маржа</TableHead>
+            <TableHead className={STICKY_HEAD}>Місце</TableHead>
+            <TableHead className={cn(STICKY_HEAD, "w-[88px] rounded-tr-lg text-right")}>
+              {""}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -198,7 +239,12 @@ export function WarehouseTable({
                   ) : null}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {item.category ?? "—"}
+                  <div>{item.category ?? "—"}</div>
+                  {item.subcategory ? (
+                    <div className="text-xs text-muted-foreground/70">
+                      {item.subcategory}
+                    </div>
+                  ) : null}
                 </TableCell>
 
                 {NUMERIC_HEADERS.map((h) => (
@@ -283,7 +329,7 @@ export function WarehouseTable({
             );
           })}
         </TableBody>
-      </Table>
+      </table>
     </div>
   );
 }

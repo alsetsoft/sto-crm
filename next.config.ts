@@ -7,9 +7,15 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
+      // DEV and PROD Supabase projects — Storage public buckets.
       {
         protocol: "https",
         hostname: "hbiohlnjosbgjfaicjae.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "xkyflpqcywxhpltbgojz.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
     ],

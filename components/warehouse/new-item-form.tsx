@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
+import type { WarehouseCategoryPair } from "@/lib/supabase/types";
 import { cn, formatUAH } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ const EMPTY = {
   article: "",
   barcode: "",
   category: "",
+  subcategory: "",
   location: "",
   unit: "шт",
   quantity: "0",
@@ -36,7 +38,11 @@ const EMPTY = {
   sale_price: "0",
 };
 
-export function NewItemForm() {
+export function NewItemForm({
+  categories,
+}: {
+  categories: WarehouseCategoryPair[];
+}) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
@@ -54,6 +60,25 @@ export function NewItemForm() {
   };
 
   const margin = num(form.sale_price) - num(form.purchase_price);
+
+  // Existing category names for the combobox suggestions.
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of categories) if (p.category) set.add(p.category);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "uk"));
+  }, [categories]);
+
+  // Subcategory suggestions for the typed category (all when none matches yet).
+  const subcategoryOptions = useMemo(() => {
+    const cat = form.category.trim();
+    const set = new Set<string>();
+    for (const p of categories) {
+      if (!p.subcategory) continue;
+      if (cat && p.category !== cat) continue;
+      set.add(p.subcategory);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "uk"));
+  }, [categories, form.category]);
 
   async function handlePhoto(file: File) {
     setUploading(true);
@@ -83,7 +108,7 @@ export function NewItemForm() {
         article: form.article.trim() || null,
         barcode: form.barcode.trim() || null,
         category: form.category.trim() || null,
-        subcategory: null,
+        subcategory: form.subcategory.trim() || null,
         location: form.location.trim() || null,
         unit: form.unit,
         quantity: num(form.quantity),
@@ -95,7 +120,7 @@ export function NewItemForm() {
         photo_url: photoUrl,
         is_archived: false,
       })
-      .select("*")
+      .select("id")
       .single();
 
     if (error) {
@@ -112,25 +137,32 @@ export function NewItemForm() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
+    <div className="flex flex-col gap-3">
+      <header className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" className="-ml-2" asChild>
           <Link href="/sklad">
             <ArrowLeft className="h-4 w-4" aria-hidden />
             До складу
           </Link>
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Нова позиція складу</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Заповніть дані нової складської позиції.
-          </p>
-        </div>
+        <h1 className="text-xl font-bold text-foreground">Нова позиція складу</h1>
       </header>
 
-      <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 flex flex-col gap-1.5">
+      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+        {/* Suggestions for the category/subcategory comboboxes */}
+        <datalist id="ni-categories">
+          {categoryOptions.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+        <datalist id="ni-subcategories">
+          {subcategoryOptions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="col-span-2 flex flex-col gap-1 md:col-span-4">
             <Label htmlFor="ni-name">Назва</Label>
             <Input
               id="ni-name"
@@ -139,7 +171,8 @@ export function NewItemForm() {
               placeholder="Олива моторна 5W-30"
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
             <Label htmlFor="ni-article">Артикул</Label>
             <Input
               id="ni-article"
@@ -148,7 +181,7 @@ export function NewItemForm() {
               placeholder="OIL-5W30"
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
             <Label htmlFor="ni-barcode">Штрих-код</Label>
             <Input
               id="ni-barcode"
@@ -156,16 +189,31 @@ export function NewItemForm() {
               onChange={(e) => set("barcode", e.target.value)}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
             <Label htmlFor="ni-category">Категорія</Label>
             <Input
               id="ni-category"
+              list="ni-categories"
               value={form.category}
               onChange={(e) => set("category", e.target.value)}
-              placeholder="Оливи"
+              placeholder="Оберіть або впишіть"
+              autoComplete="off"
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
+            <Label htmlFor="ni-subcategory">Підкатегорія</Label>
+            <Input
+              id="ni-subcategory"
+              list="ni-subcategories"
+              value={form.subcategory}
+              onChange={(e) => set("subcategory", e.target.value)}
+              placeholder="Оберіть або впишіть"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
             <Label htmlFor="ni-unit">Одиниця</Label>
             <Select value={form.unit} onValueChange={(v) => set("unit", v)}>
               <SelectTrigger id="ni-unit">
@@ -180,7 +228,7 @@ export function NewItemForm() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             <Label htmlFor="ni-qty">Залишок</Label>
             <Input
               id="ni-qty"
@@ -189,15 +237,17 @@ export function NewItemForm() {
               onChange={(e) => set("quantity", e.target.value)}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="col-span-2 flex flex-col gap-1">
             <Label htmlFor="ni-loc">Місце</Label>
             <Input
               id="ni-loc"
               value={form.location}
               onChange={(e) => set("location", e.target.value)}
+              placeholder="Стелаж А-3"
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+
+          <div className="flex flex-col gap-1">
             <Label htmlFor="ni-min">Мінімум</Label>
             <Input
               id="ni-min"
@@ -206,8 +256,8 @@ export function NewItemForm() {
               onChange={(e) => set("min_stock", e.target.value)}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ni-rec">Рекомендовано</Label>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="ni-rec">Реком.</Label>
             <Input
               id="ni-rec"
               inputMode="decimal"
@@ -215,7 +265,7 @@ export function NewItemForm() {
               onChange={(e) => set("recommended_stock", e.target.value)}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             <Label htmlFor="ni-buy">Закупка (₴)</Label>
             <Input
               id="ni-buy"
@@ -224,7 +274,7 @@ export function NewItemForm() {
               onChange={(e) => set("purchase_price", e.target.value)}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             <Label htmlFor="ni-sell">Продаж (₴)</Label>
             <Input
               id="ni-sell"
@@ -234,9 +284,9 @@ export function NewItemForm() {
             />
           </div>
 
-          {/* Margin (computed from input/output price) */}
-          <div className="col-span-2 flex items-center justify-between rounded-md border border-dashed border-border bg-muted/30 px-3 py-2">
-            <span className="text-sm text-muted-foreground">Маржа на одиницю</span>
+          {/* Margin + photo share one compact row */}
+          <div className="col-span-2 flex items-center justify-between rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 md:col-span-2">
+            <span className="text-sm text-muted-foreground">Маржа на од.</span>
             <span
               className={cn(
                 "text-sm font-semibold",
@@ -249,9 +299,7 @@ export function NewItemForm() {
             </span>
           </div>
 
-          {/* Photo */}
-          <div className="col-span-2 flex flex-col gap-1.5">
-            <Label>Фото позиції</Label>
+          <div className="col-span-2 flex items-center gap-3 md:col-span-2">
             <input
               ref={fileRef}
               type="file"
@@ -264,28 +312,28 @@ export function NewItemForm() {
               }}
             />
             {photoUrl ? (
-              <div className="relative h-32 w-32 overflow-hidden rounded-md border border-border">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border">
                 <Image
                   src={photoUrl}
                   alt="Фото позиції"
                   fill
-                  sizes="128px"
+                  sizes="64px"
                   className="object-cover"
                 />
                 <button
                   type="button"
                   onClick={() => setPhotoUrl(null)}
                   aria-label="Прибрати фото"
-                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm hover:bg-background"
+                  className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm hover:bg-background"
                 >
-                  <X className="h-4 w-4" aria-hidden />
+                  <X className="h-3.5 w-3.5" aria-hidden />
                 </button>
               </div>
             ) : (
               <Button
                 type="button"
                 variant="outline"
-                className="w-fit"
+                size="sm"
                 disabled={uploading}
                 onClick={() => fileRef.current?.click()}
               >
@@ -294,13 +342,13 @@ export function NewItemForm() {
                 ) : (
                   <ImagePlus className="h-4 w-4" aria-hidden />
                 )}
-                Завантажити фото
+                Фото
               </Button>
             )}
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-end gap-2">
+        <div className="mt-4 flex items-center justify-end gap-2">
           <Button variant="outline" asChild disabled={saving}>
             <Link href="/sklad">Скасувати</Link>
           </Button>
