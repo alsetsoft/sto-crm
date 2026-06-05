@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Package, Search, Archive, Save, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
-import type { WarehouseItemRow } from "@/lib/supabase/types";
+import type {
+  WarehouseItemRow,
+  WarehouseOverview,
+} from "@/lib/supabase/types";
 import { cn, formatUAH } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,59 +22,135 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WarehouseTable } from "./warehouse-table";
+import { WarehousePagination } from "./pagination";
 import { uploadWarehousePhoto } from "./photo";
 import {
   ALL_CATEGORIES,
-  computeStats,
   type EditableField,
   type EditMap,
 } from "./types";
 
+interface WarehouseFilters {
+  q: string;
+  category: string;
+  subcategory: string;
+  showArchived: boolean;
+}
+
 interface WarehouseClientProps {
   initialItems: WarehouseItemRow[];
   loadError: string | null;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  overview: WarehouseOverview;
+  filters: WarehouseFilters;
+}
+
+/** One entry of the merged category/subcategory dropdown. */
+interface CategoryOption {
+  value: string; // stable key used as the Select value
+  label: string;
+  category: string;
+  subcategory: string;
+  isSub: boolean;
 }
 
 export function WarehouseClient({
   initialItems,
   loadError,
+  totalCount,
+  page,
+  pageSize,
+  overview,
+  filters,
 }: WarehouseClientProps) {
+  const router = useRouter();
+
   const [items, setItems] = useState<WarehouseItemRow[]>(initialItems);
   const [edits, setEdits] = useState<EditMap>({});
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<string>(ALL_CATEGORIES);
-  const [showArchived, setShowArchived] = useState(false);
+  const [search, setSearch] = useState(filters.q);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    for (const it of items) if (it.category) set.add(it.category);
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "uk"));
-  }, [items]);
+  // The server is the source of truth for the visible page; re-sync whenever a
+  // navigation/refresh delivers a new page of rows, and drop any pending edits.
+  useEffect(() => {
+    setItems(initialItems);
+    setEdits({});
+  }, [initialItems]);
 
-  const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return items.filter((it) => {
-      if (!showArchived && it.is_archived) return false;
-      if (category !== ALL_CATEGORIES && it.category !== category) return false;
-      if (!q) return true;
-      return (
-        it.name.toLowerCase().includes(q) ||
-        (it.article ?? "").toLowerCase().includes(q) ||
-        (it.barcode ?? "").toLowerCase().includes(q)
-      );
+  // Build a /sklad URL from the full filter state and navigate to it.
+  function navigate(next: Partial<WarehouseFilters & { page: number }>) {
+    const q = next.q ?? search.trim();
+    const category = next.category ?? filters.category;
+    const subcategory = next.subcategory ?? filters.subcategory;
+    const showArchived = next.showArchived ?? filters.showArchived;
+    const targetPage = next.page ?? 1;
+
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (category) params.set("cat", category);
+    if (subcategory) params.set("sub", subcategory);
+    if (showArchived) params.set("arch", "1");
+    if (targetPage > 1) params.set("page", String(targetPage));
+
+    const qs = params.toString();
+    router.push(qs ? `/sklad?${qs}` : "/sklad");
+  }
+
+  // Debounced search → push to the URL (resets to page 1).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (search.trim() === filters.q) return;
+      navigate({ q: search.trim(), page: 1 });
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  // Flat list of dropdown entries: each category followed by its subcategories.
+  const categoryOptions = useMemo<CategoryOption[]>(() => {
+    const byCat = new Map<string, Set<string>>();
+    for (const p of overview.categories) {
+      if (!p.category) continue;
+      if (!byCat.has(p.category)) byCat.set(p.category, new Set());
+      if (p.subcategory) byCat.get(p.category)!.add(p.subcategory);
+    }
+
+    const out: CategoryOption[] = [];
+    const cats = Array.from(byCat.keys()).sort((a, b) => a.localeCompare(b, "uk"));
+    for (const c of cats) {
+      out.push({ value: `c${out.length}`, label: c, category: c, subcategory: "", isSub: false });
+      const subs = Array.from(byCat.get(c)!).sort((a, b) => a.localeCompare(b, "uk"));
+      for (const s of subs) {
+        out.push({ value: `s${out.length}`, label: s, category: c, subcategory: s, isSub: true });
+      }
+    }
+    return out;
+  }, [overview.categories]);
+
+  // Which dropdown entry matches the active filter.
+  const currentCategoryValue = useMemo(() => {
+    if (!filters.category) return ALL_CATEGORIES;
+    const match = categoryOptions.find(
+      (o) => o.category === filters.category && o.subcategory === filters.subcategory
+    );
+    return match?.value ?? ALL_CATEGORIES;
+  }, [categoryOptions, filters.category, filters.subcategory]);
+
+  function handleCategorySelect(value: string) {
+    if (value === ALL_CATEGORIES) {
+      navigate({ category: "", subcategory: "", page: 1 });
+      return;
+    }
+    const opt = categoryOptions.find((o) => o.value === value);
+    navigate({
+      category: opt?.category ?? "",
+      subcategory: opt?.subcategory ?? "",
+      page: 1,
     });
-  }, [items, search, category, showArchived]);
-
-  const activeItems = useMemo(
-    () => items.filter((it) => !it.is_archived),
-    [items]
-  );
-  const stats = useMemo(
-    () => computeStats(activeItems, edits),
-    [activeItems, edits]
-  );
+  }
 
   const dirtyCount = Object.keys(edits).length;
 
@@ -98,7 +178,7 @@ export function WarehouseClient({
     const supabase = createClient();
 
     const updates = Object.entries(edits).map(([id, patch]) =>
-      supabase.from("warehouse_items").update(patch).eq("id", id).select("*").single()
+      supabase.from("warehouse_items").update(patch).eq("id", id).select("id").single()
     );
 
     const results = await Promise.all(updates);
@@ -112,36 +192,25 @@ export function WarehouseClient({
       return;
     }
 
-    setItems((prev) => {
-      const byId = new Map(prev.map((it) => [it.id, it]));
-      for (const r of results) {
-        const row = r.data as WarehouseItemRow | null;
-        if (row) byId.set(row.id, row);
-      }
-      return Array.from(byId.values());
-    });
-    setEdits({});
     setSaving(false);
     toast.success("Зміни збережено");
+    // Pull fresh rows + recomputed totals from the server.
+    router.refresh();
   }
 
   async function handleToggleArchive(item: WarehouseItemRow) {
     const supabase = createClient();
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("warehouse_items")
       .update({ is_archived: !item.is_archived })
-      .eq("id", item.id)
-      .select("*")
-      .single();
+      .eq("id", item.id);
 
-    if (error || !data) {
-      toast.error("Не вдалося змінити статус", { description: error?.message });
+    if (error) {
+      toast.error("Не вдалося змінити статус", { description: error.message });
       return;
     }
-    setItems((prev) =>
-      prev.map((it) => (it.id === item.id ? (data as WarehouseItemRow) : it))
-    );
     toast.success(item.is_archived ? "Позицію відновлено" : "Позицію архівовано");
+    router.refresh();
   }
 
   async function handlePhoto(item: WarehouseItemRow, file: File) {
@@ -149,21 +218,17 @@ export function WarehouseClient({
     try {
       const url = await uploadWarehousePhoto(file);
       const supabase = createClient();
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("warehouse_items")
         .update({ photo_url: url })
-        .eq("id", item.id)
-        .select("*")
-        .single();
+        .eq("id", item.id);
 
-      if (error || !data) {
-        toast.error("Не вдалося зберегти фото", { description: error?.message });
+      if (error) {
+        toast.error("Не вдалося зберегти фото", { description: error.message });
         return;
       }
-      setItems((prev) =>
-        prev.map((it) => (it.id === item.id ? (data as WarehouseItemRow) : it))
-      );
       toast.success("Фото оновлено");
+      router.refresh();
     } catch (e) {
       toast.error("Не вдалося завантажити фото", {
         description: e instanceof Error ? e.message : undefined,
@@ -185,13 +250,10 @@ export function WarehouseClient({
       toast.error("Не вдалося видалити", { description: error.message });
       return;
     }
-    setItems((prev) => prev.filter((it) => it.id !== item.id));
-    setEdits((prev) => {
-      const next = { ...prev };
-      delete next[item.id];
-      return next;
-    });
     toast.success("Позицію видалено");
+    // If we just removed the last row on a page beyond the first, step back.
+    if (items.length === 1 && page > 1) navigate({ page: page - 1 });
+    else router.refresh();
   }
 
   return (
@@ -206,20 +268,20 @@ export function WarehouseClient({
             <h1 className="text-2xl font-bold text-foreground">Склад</h1>
           </div>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
-            <span>{stats.count} позицій</span>
+            <span>{overview.active_count} позицій</span>
             <span aria-hidden>·</span>
-            <span className={cn(stats.belowMin > 0 && "font-medium text-warning")}>
-              {stats.belowMin} нижче мінімуму
+            <span className={cn(overview.below_min > 0 && "font-medium text-warning")}>
+              {overview.below_min} нижче мінімуму
             </span>
             <span aria-hidden>·</span>
-            <span className={cn(stats.negative > 0 && "font-medium text-destructive")}>
-              {stats.negative} в мінусі
+            <span className={cn(overview.negative > 0 && "font-medium text-destructive")}>
+              {overview.negative} в мінусі
             </span>
             <span aria-hidden>·</span>
             <span>
               Вартість:{" "}
               <span className="font-semibold text-foreground">
-                {formatUAH(stats.totalValue)}
+                {formatUAH(overview.total_value)}
               </span>
             </span>
           </p>
@@ -255,38 +317,50 @@ export function WarehouseClient({
             aria-label="Пошук позицій"
           />
         </div>
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-[200px]">
+        <Select value={currentCategoryValue} onValueChange={handleCategorySelect}>
+          <SelectTrigger className="w-[240px]">
             <SelectValue placeholder="Усі категорії" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_CATEGORIES}>Усі категорії</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
+            {categoryOptions.map((o) => (
+              <SelectItem
+                key={o.value}
+                value={o.value}
+                className={o.isSub ? "pl-10 text-muted-foreground" : "font-medium"}
+              >
+                {o.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Button
-          variant={showArchived ? "secondary" : "outline"}
-          onClick={() => setShowArchived((v) => !v)}
-          aria-pressed={showArchived}
+          variant={filters.showArchived ? "secondary" : "outline"}
+          onClick={() => navigate({ showArchived: !filters.showArchived, page: 1 })}
+          aria-pressed={filters.showArchived}
         >
           <Archive className="h-4 w-4" aria-hidden />
-          {showArchived ? "Усі" : "Активні"}
+          {filters.showArchived ? "Усі" : "Активні"}
         </Button>
       </div>
 
       {/* Table */}
       <WarehouseTable
-        items={visibleItems}
+        items={items}
         edits={edits}
         uploadingId={uploadingId}
         onEdit={handleEdit}
         onToggleArchive={handleToggleArchive}
         onDelete={handleDelete}
         onPhoto={handlePhoto}
+      />
+
+      {/* Pagination */}
+      <WarehousePagination
+        page={page}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        onPageChange={(p) => navigate({ page: p })}
       />
 
       {/* Sticky save bar */}

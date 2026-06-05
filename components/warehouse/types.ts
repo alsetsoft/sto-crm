@@ -18,6 +18,9 @@ export const UNIT_OPTIONS = ["шт", "л", "компл", "м", "кг"] as const;
 
 export const ALL_CATEGORIES = "__all__";
 
+/** Rows per page for the server-paginated warehouse list. */
+export const PAGE_SIZE = 20;
+
 /** Returns the effective value of a field (pending edit if present, else stored). */
 export function effective(
   item: WarehouseItemRow,
@@ -26,36 +29,6 @@ export function effective(
 ): number {
   const pending = edits[item.id]?.[field];
   return pending ?? item[field];
-}
-
-export interface WarehouseStats {
-  count: number;
-  belowMin: number;
-  negative: number;
-  totalValue: number;
-}
-
-/** Computes header stats over the visible (non-archived) items using effective values. */
-export function computeStats(
-  items: WarehouseItemRow[],
-  edits: EditMap
-): WarehouseStats {
-  let belowMin = 0;
-  let negative = 0;
-  let totalValue = 0;
-
-  for (const item of items) {
-    const qty = effective(item, edits, "quantity");
-    const minStock = effective(item, edits, "min_stock");
-    const purchase = effective(item, edits, "purchase_price");
-
-    if (qty < 0) negative += 1;
-    else if (qty < minStock) belowMin += 1;
-
-    totalValue += qty * purchase;
-  }
-
-  return { count: items.length, belowMin, negative, totalValue };
 }
 
 export type RowStatus = "ok" | "below" | "negative";
