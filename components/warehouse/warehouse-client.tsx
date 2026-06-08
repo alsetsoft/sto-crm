@@ -330,15 +330,24 @@ export function WarehouseClient({
 
       {/* Sticky save bar */}
       {dirtyCount > 0 ? (
-        <div className="sticky bottom-4 z-10 flex animate-fade-in-up items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3 shadow-elegant">
+        <div className="sticky bottom-4 z-10 flex animate-fade-in-up flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-elegant sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             Незбережених змін: <span className="font-semibold text-foreground">{dirtyCount}</span>
           </span>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => setEdits({})} disabled={saving}>
+            <Button
+              variant="ghost"
+              onClick={() => setEdits({})}
+              disabled={saving}
+              className="flex-1 sm:flex-none"
+            >
               Скасувати
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 sm:flex-none"
+            >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
