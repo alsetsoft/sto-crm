@@ -4,11 +4,22 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Loader2, ImagePlus, X } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  ImagePlus,
+  Loader2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
-import type { WarehouseCategoryPair } from "@/lib/supabase/types";
+import type {
+  WarehouseCategoryPair,
+  WarehouseItemRow,
+} from "@/lib/supabase/types";
 import { cn, formatUAH } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,16 +49,43 @@ const EMPTY = {
   sale_price: "0",
 };
 
+/** Maps a stored item onto the string-keyed form shape. */
+function toForm(item: WarehouseItemRow): typeof EMPTY {
+  return {
+    name: item.name,
+    article: item.article ?? "",
+    barcode: item.barcode ?? "",
+    category: item.category ?? "",
+    subcategory: item.subcategory ?? "",
+    location: item.location ?? "",
+    unit: item.unit,
+    quantity: String(item.quantity),
+    min_stock: String(item.min_stock),
+    recommended_stock: String(item.recommended_stock),
+    purchase_price: String(item.purchase_price),
+    sale_price: String(item.sale_price),
+  };
+}
+
 export function NewItemForm({
   categories,
+  initial,
 }: {
   categories: WarehouseCategoryPair[];
+  initial?: WarehouseItemRow;
 }) {
   const router = useRouter();
+  const editing = Boolean(initial);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ ...EMPTY });
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [form, setForm] = useState(() =>
+    initial ? toForm(initial) : { ...EMPTY }
+  );
+  const [photoUrl, setPhotoUrl] = useState<string | null>(
+    initial?.photo_url ?? null
+  );
   const [uploading, setUploading] = useState(false);
+  // Which danger-zone action (if any) is in flight — disables the whole form.
+  const [busy, setBusy] = useState<null | "archive" | "delete">(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function set<K extends keyof typeof EMPTY>(key: K, value: string) {
@@ -94,44 +132,98 @@ export function NewItemForm({
     }
   }
 
-  async function handleСreate() {
+  async function handleSave() {
     if (!form.name.trim()) {
       toast.error("Вкажіть назву позиції");
       return;
     }
     setSaving(true);
     const supabase = createClient();
-    const { error } = await supabase
-      .from("warehouse_items")
-      .insert({
-        name: form.name.trim(),
-        article: form.article.trim() || null,
-        barcode: form.barcode.trim() || null,
-        category: form.category.trim() || null,
-        subcategory: form.subcategory.trim() || null,
-        location: form.location.trim() || null,
-        unit: form.unit,
-        quantity: num(form.quantity),
-        min_stock: num(form.min_stock),
-        recommended_stock: num(form.recommended_stock),
-        purchase_price: num(form.purchase_price),
-        purchase_price_avg: num(form.purchase_price),
-        sale_price: num(form.sale_price),
-        photo_url: photoUrl,
-        is_archived: false,
-      })
-      .select("id")
-      .single();
+
+    // Fields common to create and edit. The running average purchase price
+    // (purchase_price_avg) is only seeded on create — editing must not clobber it.
+    const payload = {
+      name: form.name.trim(),
+      article: form.article.trim() || null,
+      barcode: form.barcode.trim() || null,
+      category: form.category.trim() || null,
+      subcategory: form.subcategory.trim() || null,
+      location: form.location.trim() || null,
+      unit: form.unit,
+      quantity: num(form.quantity),
+      min_stock: num(form.min_stock),
+      recommended_stock: num(form.recommended_stock),
+      purchase_price: num(form.purchase_price),
+      sale_price: num(form.sale_price),
+      photo_url: photoUrl,
+    };
+
+    const { error } = editing
+      ? await supabase
+          .from("warehouse_items")
+          .update(payload)
+          .eq("id", initial!.id)
+          .select("id")
+          .single()
+      : await supabase
+          .from("warehouse_items")
+          .insert({
+            ...payload,
+            purchase_price_avg: num(form.purchase_price),
+            is_archived: false,
+          })
+          .select("id")
+          .single();
 
     if (error) {
       setSaving(false);
-      toast.error("Не вдалося створити позицію", {
-        description: error.message,
-      });
+      toast.error(
+        editing ? "Не вдалося зберегти зміни" : "Не вдалося створити позицію",
+        { description: error.message }
+      );
       return;
     }
 
-    toast.success("Позицію додано");
+    toast.success(editing ? "Позицію оновлено" : "Позицію додано");
+    router.push("/sklad");
+    router.refresh();
+  }
+
+  async function handleToggleArchive() {
+    if (!initial) return;
+    setBusy("archive");
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("warehouse_items")
+      .update({ is_archived: !initial.is_archived })
+      .eq("id", initial.id);
+
+    if (error) {
+      setBusy(null);
+      toast.error("Не вдалося змінити статус", { description: error.message });
+      return;
+    }
+    toast.success(initial.is_archived ? "Позицію відновлено" : "Позицію архівовано");
+    router.push("/sklad");
+    router.refresh();
+  }
+
+  async function handleDelete() {
+    if (!initial) return;
+    if (!window.confirm(`Видалити позицію «${initial.name}»?`)) return;
+    setBusy("delete");
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("warehouse_items")
+      .delete()
+      .eq("id", initial.id);
+
+    if (error) {
+      setBusy(null);
+      toast.error("Не вдалося видалити", { description: error.message });
+      return;
+    }
+    toast.success("Позицію видалено");
     router.push("/sklad");
     router.refresh();
   }
@@ -145,7 +237,9 @@ export function NewItemForm({
             До складу
           </Link>
         </Button>
-        <h1 className="text-xl font-bold text-foreground">Нова позиція складу</h1>
+        <h1 className="text-xl font-bold text-foreground">
+          {editing ? "Редагування позиції" : "Нова позиція складу"}
+        </h1>
       </header>
 
       <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -349,15 +443,62 @@ export function NewItemForm({
         </div>
 
         <div className="mt-4 flex items-center justify-end gap-2">
-          <Button variant="outline" asChild disabled={saving}>
+          <Button variant="outline" asChild disabled={saving || busy !== null}>
             <Link href="/sklad">Скасувати</Link>
           </Button>
-          <Button onClick={handleСreate} disabled={saving || uploading}>
+          <Button onClick={handleSave} disabled={saving || uploading || busy !== null}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            Додати
+            {editing ? "Зберегти" : "Додати"}
           </Button>
         </div>
       </div>
+
+      {editing ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">
+                Небезпечна зона
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {initial!.is_archived
+                  ? "Відновіть позицію або видаліть її назавжди."
+                  : "Архівуйте, щоб приховати зі списку, або видаліть назавжди."}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleToggleArchive}
+                disabled={saving || busy !== null}
+              >
+                {busy === "archive" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : initial!.is_archived ? (
+                  <ArchiveRestore className="h-4 w-4" aria-hidden />
+                ) : (
+                  <Archive className="h-4 w-4" aria-hidden />
+                )}
+                {initial!.is_archived ? "Відновити" : "Архівувати"}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={saving || busy !== null}
+              >
+                {busy === "delete" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                )}
+                Видалити
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

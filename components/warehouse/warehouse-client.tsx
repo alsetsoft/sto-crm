@@ -198,21 +198,6 @@ export function WarehouseClient({
     router.refresh();
   }
 
-  async function handleToggleArchive(item: WarehouseItemRow) {
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("warehouse_items")
-      .update({ is_archived: !item.is_archived })
-      .eq("id", item.id);
-
-    if (error) {
-      toast.error("Не вдалося змінити статус", { description: error.message });
-      return;
-    }
-    toast.success(item.is_archived ? "Позицію відновлено" : "Позицію архівовано");
-    router.refresh();
-  }
-
   async function handlePhoto(item: WarehouseItemRow, file: File) {
     setUploadingId(item.id);
     try {
@@ -236,24 +221,6 @@ export function WarehouseClient({
     } finally {
       setUploadingId(null);
     }
-  }
-
-  async function handleDelete(item: WarehouseItemRow) {
-    if (!window.confirm(`Видалити позицію «${item.name}»?`)) return;
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("warehouse_items")
-      .delete()
-      .eq("id", item.id);
-
-    if (error) {
-      toast.error("Не вдалося видалити", { description: error.message });
-      return;
-    }
-    toast.success("Позицію видалено");
-    // If we just removed the last row on a page beyond the first, step back.
-    if (items.length === 1 && page > 1) navigate({ page: page - 1 });
-    else router.refresh();
   }
 
   return (
@@ -350,8 +317,6 @@ export function WarehouseClient({
         edits={edits}
         uploadingId={uploadingId}
         onEdit={handleEdit}
-        onToggleArchive={handleToggleArchive}
-        onDelete={handleDelete}
         onPhoto={handlePhoto}
       />
 
@@ -365,15 +330,24 @@ export function WarehouseClient({
 
       {/* Sticky save bar */}
       {dirtyCount > 0 ? (
-        <div className="sticky bottom-4 z-10 flex animate-fade-in-up items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3 shadow-elegant">
+        <div className="sticky bottom-4 z-10 flex animate-fade-in-up flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-elegant sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             Незбережених змін: <span className="font-semibold text-foreground">{dirtyCount}</span>
           </span>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => setEdits({})} disabled={saving}>
+            <Button
+              variant="ghost"
+              onClick={() => setEdits({})}
+              disabled={saving}
+              className="flex-1 sm:flex-none"
+            >
               Скасувати
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 sm:flex-none"
+            >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (

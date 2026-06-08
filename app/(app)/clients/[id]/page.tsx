@@ -51,12 +51,12 @@ export default async function ClientDetailPage({
     subtitle: o.cars
       ? [[o.cars.make, o.cars.model].filter(Boolean).join(" "), o.cars.plate]
           .filter(Boolean)
-          .join(" · ")
+          .join(" В· ")
       : undefined,
   }));
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+    <main className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
         <ClientDetail
           client={client as ClientDetailData}

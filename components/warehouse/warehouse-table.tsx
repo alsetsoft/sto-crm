@@ -2,15 +2,14 @@
 
 import { useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   AlertTriangle,
-  Archive,
-  ArchiveRestore,
   ImagePlus,
   Loader2,
   Minus,
+  Pencil,
   Plus,
-  Trash2,
 } from "lucide-react";
 
 import type { WarehouseItemRow } from "@/lib/supabase/types";
@@ -36,8 +35,6 @@ interface WarehouseTableProps {
   edits: EditMap;
   uploadingId: string | null;
   onEdit: (id: string, field: EditableField, value: number) => void;
-  onToggleArchive: (item: WarehouseItemRow) => void;
-  onDelete: (item: WarehouseItemRow) => void;
   onPhoto: (item: WarehouseItemRow, file: File) => void;
 }
 
@@ -56,7 +53,7 @@ function PhotoCell({
       type="button"
       onClick={() => ref.current?.click()}
       title={item.photo_url ? "Змінити фото" : "Додати фото"}
-      className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40 text-muted-foreground transition-smooth hover:border-primary hover:text-primary"
+      className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40 text-muted-foreground transition-smooth hover:border-primary hover:text-primary"
     >
       <input
         ref={ref}
@@ -76,7 +73,7 @@ function PhotoCell({
           src={item.photo_url}
           alt={item.name}
           fill
-          sizes="44px"
+          sizes="40px"
           className="object-cover"
         />
       ) : (
@@ -100,7 +97,7 @@ const NUMERIC_HEADERS: { field: EditableField; label: string }[] = [
 ];
 
 const STEP_BTN =
-  "flex h-9 w-7 shrink-0 items-center justify-center text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40";
+  "flex h-9 w-6 shrink-0 items-center justify-center text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40";
 
 function NumberCell({
   value,
@@ -119,7 +116,7 @@ function NumberCell({
     <div className="flex flex-col items-center gap-0.5">
       <div
         className={cn(
-          "flex items-center overflow-hidden rounded-md border bg-card shadow-sm transition-smooth focus-within:ring-2 focus-within:ring-ring",
+          "flex w-[88px] items-center overflow-hidden rounded-md border bg-card shadow-sm transition-smooth focus-within:ring-2 focus-within:ring-ring",
           status === "negative" && "border-destructive",
           status === "below" && "border-warning",
           (!status || status === "ok") && "border-input",
@@ -139,7 +136,7 @@ function NumberCell({
         <input
           inputMode="decimal"
           className={cn(
-            "h-9 w-12 bg-transparent px-1 text-center text-sm text-foreground focus-visible:outline-none",
+            "h-9 w-full min-w-0 flex-1 bg-transparent px-0.5 text-center text-sm text-foreground focus-visible:outline-none",
             status === "negative" && "text-destructive",
             status === "below" && "text-warning"
           )}
@@ -170,8 +167,6 @@ export function WarehouseTable({
   edits,
   uploadingId,
   onEdit,
-  onToggleArchive,
-  onDelete,
   onPhoto,
 }: WarehouseTableProps) {
   if (items.length === 0) {
@@ -187,21 +182,31 @@ export function WarehouseTable({
       <table className="w-full caption-bottom text-sm">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className={cn(STICKY_HEAD, "w-[60px] rounded-tl-lg")}>
+            <TableHead className={cn(STICKY_HEAD, "w-[56px] px-2 rounded-tl-lg")}>
               Фото
             </TableHead>
-            <TableHead className={cn(STICKY_HEAD, "min-w-[220px]")}>
+            {/* Rubbery column — absorbs slack (w-full), but never collapses (min-w). */}
+            <TableHead className={cn(STICKY_HEAD, "w-full min-w-[160px] px-2")}>
               Назва / Артикул
             </TableHead>
-            <TableHead className={STICKY_HEAD}>Категорія</TableHead>
+            <TableHead className={cn(STICKY_HEAD, "px-2")}>Категорія</TableHead>
             {NUMERIC_HEADERS.map((h) => (
-              <TableHead key={h.field} className={cn(STICKY_HEAD, "text-center")}>
+              <TableHead
+                key={h.field}
+                className={cn(STICKY_HEAD, "whitespace-nowrap px-1 text-center")}
+              >
                 {h.label}
               </TableHead>
             ))}
-            <TableHead className={cn(STICKY_HEAD, "text-center")}>Маржа</TableHead>
-            <TableHead className={STICKY_HEAD}>Місце</TableHead>
-            <TableHead className={cn(STICKY_HEAD, "w-[88px] rounded-tr-lg text-right")}>
+            <TableHead
+              className={cn(STICKY_HEAD, "whitespace-nowrap px-1 text-center")}
+            >
+              Маржа
+            </TableHead>
+            <TableHead className={cn(STICKY_HEAD, "px-2")}>Місце</TableHead>
+            <TableHead
+              className={cn(STICKY_HEAD, "w-[60px] px-1 rounded-tr-lg text-right")}
+            >
               {""}
             </TableHead>
           </TableRow>
@@ -223,32 +228,36 @@ export function WarehouseTable({
                   status === "below" && "bg-warning/5"
                 )}
               >
-                <TableCell>
+                <TableCell className="px-2">
                   <PhotoCell
                     item={item}
                     uploading={uploadingId === item.id}
                     onPhoto={onPhoto}
                   />
                 </TableCell>
-                <TableCell>
-                  <div className="font-medium text-foreground">{item.name}</div>
+                <TableCell className="px-2">
+                  <div className="break-words font-medium text-foreground">
+                    {item.name}
+                  </div>
                   {item.article ? (
-                    <div className="text-xs uppercase text-muted-foreground">
+                    <div className="break-words text-xs uppercase text-muted-foreground">
                       {item.article}
                     </div>
                   ) : null}
                 </TableCell>
-                <TableCell className="text-muted-foreground">
-                  <div>{item.category ?? "—"}</div>
+                <TableCell className="px-2 text-muted-foreground">
+                  <div className="max-w-[120px] break-words">
+                    {item.category ?? "—"}
+                  </div>
                   {item.subcategory ? (
-                    <div className="text-xs text-muted-foreground/70">
+                    <div className="max-w-[120px] break-words text-xs text-muted-foreground/70">
                       {item.subcategory}
                     </div>
                   ) : null}
                 </TableCell>
 
                 {NUMERIC_HEADERS.map((h) => (
-                  <TableCell key={h.field}>
+                  <TableCell key={h.field} className="px-1">
                     <NumberCell
                       value={effective(item, edits, h.field)}
                       unit={h.field === "quantity" ? item.unit : undefined}
@@ -259,7 +268,7 @@ export function WarehouseTable({
                   </TableCell>
                 ))}
 
-                <TableCell className="text-center">
+                <TableCell className="px-1 text-center">
                   {(() => {
                     const margin =
                       effective(item, edits, "sale_price") -
@@ -279,16 +288,18 @@ export function WarehouseTable({
                   })()}
                 </TableCell>
 
-                <TableCell className="text-muted-foreground">
-                  {item.location ?? "—"}
+                <TableCell className="px-2 text-muted-foreground">
+                  <div className="max-w-[100px] break-words">
+                    {item.location ?? "—"}
+                  </div>
                 </TableCell>
 
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1">
+                <TableCell className="px-1">
+                  <div className="flex items-center justify-end gap-0.5">
                     {status !== "ok" ? (
                       <AlertTriangle
                         className={cn(
-                          "h-4 w-4",
+                          "h-3.5 w-3.5 shrink-0",
                           status === "negative"
                             ? "text-destructive"
                             : "text-warning"
@@ -298,31 +309,18 @@ export function WarehouseTable({
                         }
                       />
                     ) : null}
-                    <div className="flex items-center opacity-0 transition-smooth group-hover:opacity-100">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={
-                          item.is_archived ? "Відновити" : "Архівувати"
-                        }
-                        onClick={() => onToggleArchive(item)}
-                      >
-                        {item.is_archived ? (
-                          <ArchiveRestore className="h-4 w-4" />
-                        ) : (
-                          <Archive className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        aria-label="Видалити"
-                        onClick={() => onDelete(item)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Редагувати"
+                      title="Редагувати"
+                      className="h-8 w-8 shrink-0"
+                      asChild
+                    >
+                      <Link href={`/sklad/${item.id}/redaguvaty`}>
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
