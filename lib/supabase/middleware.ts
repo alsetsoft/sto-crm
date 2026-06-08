@@ -3,19 +3,6 @@ import { createServerClient } from "@supabase/ssr";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
-// Only the Склад (warehouse) module is available for now. Every other app
-// route is temporarily gated and redirected here. Add prefixes as modules ship.
-const AVAILABLE_PREFIXES = ["/sklad"];
-
-function isReachable(pathname: string): boolean {
-  if (pathname === "/") return true; // root redirects to /sklad in the page
-  if (pathname.startsWith("/api")) return true; // internal API routes
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) return true;
-  return AVAILABLE_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  );
-}
-
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -55,13 +42,6 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && pathname.startsWith("/login")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/sklad";
-    return NextResponse.redirect(url);
-  }
-
-  // Gate every not-yet-available module to the warehouse.
-  if (user && !isReachable(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/sklad";
     return NextResponse.redirect(url);
