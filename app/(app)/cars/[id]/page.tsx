@@ -39,7 +39,7 @@ export default async function CarDetailPage({
   const visits = (orders ?? []) as unknown as VisitRow[];
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+    <main className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
         <CarDetail car={car as unknown as CarDetailData} visits={visits} />
       </div>

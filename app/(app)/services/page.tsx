@@ -18,7 +18,7 @@ export default async function ServicesPage() {
   const services = (data ?? []) as ServiceListRow[];
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+    <main className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl">
         <ServicesClient
           initialServices={services}
