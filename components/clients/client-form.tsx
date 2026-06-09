@@ -71,7 +71,7 @@ export function ClientForm({ initial }: { initial?: ClientFormInitial }) {
         <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
           <Link href={editing ? `/clients/${initial!.id}` : "/clients"}>
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            {editing ? "До картки" : "До клієнтів"}
+            Назад
           </Link>
         </Button>
         <h1 className="text-2xl font-bold text-foreground">

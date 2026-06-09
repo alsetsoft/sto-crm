@@ -79,7 +79,7 @@ export function ClientDetail({ client, cars, visits }: ClientDetailProps) {
         <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
           <Link href="/clients">
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            До клієнтів
+            Назад
           </Link>
         </Button>
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -233,7 +233,7 @@ export function NewOrderWizard({ customers, cars }: NewOrderWizardProps) {
         <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
           <Link href="/plan">
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            До плану
+            Назад
           </Link>
         </Button>
         <h1 className="text-2xl font-bold text-foreground">Новий наряд</h1>

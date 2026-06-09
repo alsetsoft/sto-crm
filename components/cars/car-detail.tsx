@@ -85,7 +85,7 @@ export function CarDetail({ car, visits }: CarDetailProps) {
         <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
           <Link href="/cars">
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            До авто
+            Назад
           </Link>
         </Button>
         <div className="flex flex-wrap items-center justify-between gap-3">

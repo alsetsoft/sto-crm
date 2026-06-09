@@ -162,7 +162,7 @@ export function CarForm({ customers, initial, defaultCustomerId }: CarFormProps)
         <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
           <Link href={backHref}>
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            {editing ? "До картки" : "До авто"}
+            Назад
           </Link>
         </Button>
         <h1 className="text-2xl font-bold text-foreground">

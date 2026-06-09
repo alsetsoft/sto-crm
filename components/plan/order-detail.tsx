@@ -252,7 +252,7 @@ export function OrderDetail({
         <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
           <Link href="/plan">
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            До плану
+            Назад
           </Link>
         </Button>
         <div className="flex flex-wrap items-center justify-between gap-3">

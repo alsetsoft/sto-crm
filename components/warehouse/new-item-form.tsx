@@ -234,7 +234,7 @@ export function NewItemForm({
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
           <Link href="/sklad">
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            До складу
+            Назад
           </Link>
         </Button>
         <h1 className="text-xl font-bold text-foreground">

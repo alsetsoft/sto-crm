@@ -221,7 +221,7 @@ export function EmployeeDetail({
         <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
           <Link href="/employees">
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            До працівників
+            Назад
           </Link>
         </Button>
         <div className="flex flex-wrap items-center justify-between gap-3">

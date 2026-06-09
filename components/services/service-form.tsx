@@ -87,7 +87,7 @@ export function ServiceForm({ initial }: { initial?: ServiceFormInitial }) {
         <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
           <Link href="/services">
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            До послуг
+            Назад
           </Link>
         </Button>
         <h1 className="text-2xl font-bold text-foreground">
