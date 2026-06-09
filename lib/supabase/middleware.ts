@@ -3,6 +3,17 @@ import { createServerClient } from "@supabase/ssr";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
+// Modules that are not open yet. Authenticated requests to these are bounced to
+// the only live module (Склад). Keep in sync with `available` in nav-items.ts.
+const LOCKED_PREFIXES = [
+  "/plan",
+  "/problems",
+  "/clients",
+  "/cars",
+  "/services",
+  "/employees",
+];
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -42,6 +53,16 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && pathname.startsWith("/login")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/sklad";
+    return NextResponse.redirect(url);
+  }
+
+  // Gate off modules that aren't open yet (matches the path or any sub-route).
+  const isLocked = LOCKED_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  );
+  if (user && isLocked) {
     const url = request.nextUrl.clone();
     url.pathname = "/sklad";
     return NextResponse.redirect(url);

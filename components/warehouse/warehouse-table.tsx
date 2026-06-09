@@ -116,7 +116,7 @@ function NumberCell({
     <div className="flex flex-col items-center gap-0.5">
       <div
         className={cn(
-          "flex w-[88px] items-center overflow-hidden rounded-md border bg-card shadow-sm transition-smooth focus-within:ring-2 focus-within:ring-ring",
+          "flex h-9 w-[88px] items-center overflow-hidden rounded-md border bg-card shadow-sm transition-smooth focus-within:ring-2 focus-within:ring-ring",
           status === "negative" && "border-destructive",
           status === "below" && "border-warning",
           (!status || status === "ok") && "border-input",
@@ -155,9 +155,11 @@ function NumberCell({
           <Plus className="h-3.5 w-3.5" aria-hidden />
         </button>
       </div>
-      {unit ? (
-        <span className="text-[11px] text-muted-foreground">{unit}</span>
-      ) : null}
+      {/* Always reserve the label line so every numeric cell is the same
+          height and all input boxes align on one horizontal row. */}
+      <span className="h-3.5 text-[11px] leading-none text-muted-foreground">
+        {unit ?? ""}
+      </span>
     </div>
   );
 }
@@ -178,7 +180,7 @@ export function WarehouseTable({
   }
 
   return (
-    <div className="max-h-[calc(100vh-13rem)] overflow-auto rounded-lg border border-border bg-card shadow-card">
+    <div className="h-full overflow-auto rounded-lg border border-border bg-card shadow-card">
       <table className="w-full caption-bottom text-sm">
         <TableHeader>
           <TableRow className="hover:bg-transparent">

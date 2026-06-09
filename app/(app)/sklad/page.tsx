@@ -69,8 +69,8 @@ export default async function SkladPage({
   };
 
   return (
-    <main className="px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <main className="flex h-[calc(100dvh-3.5rem)] flex-col px-4 py-6 sm:px-6 lg:h-screen lg:px-8">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
         <WarehouseClient
           initialItems={items}
           loadError={loadError}
