@@ -5,14 +5,7 @@ const PUBLIC_PATHS = ["/login", "/auth"];
 
 // Modules that are not open yet. Authenticated requests to these are bounced to
 // the only live module (Склад). Keep in sync with `available` in nav-items.ts.
-const LOCKED_PREFIXES = [
-  "/plan",
-  "/problems",
-  "/clients",
-  "/cars",
-  "/services",
-  "/employees",
-];
+const LOCKED_PREFIXES: string[] = [];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
